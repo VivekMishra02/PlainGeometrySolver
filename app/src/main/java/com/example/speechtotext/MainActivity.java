@@ -1,47 +1,69 @@
 package com.example.speechtotext;
-
 import androidx.appcompat.app.AppCompatActivity;
-
-import android.content.Context;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
 import android.os.Bundle;
-
+import java.io.IOException;
+import java.util.*;
 import androidx.constraintlayout.widget.ConstraintLayout;
-
 import android.content.Intent;
 import android.speech.RecognizerIntent;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.graphics.Point;
-import android.graphics.Path;
+import com.example.speechtotext.Pojo.Circle;
+import com.example.speechtotext.Pojo.Rectangle;
+import com.example.speechtotext.Pojo.Triangle;
+import com.example.speechtotext.Pojo.myView;
 import java.util.ArrayList;
 import java.util.Locale;
-
-import java.util.Collections;
-
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.MediaType;
+import okhttp3.RequestBody;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
     private final int REQ_CODE = 100;
     EditText textView2;
+    String text = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         setContentView(R.layout.activity_main);
         textView2 = findViewById(R.id.drawImage);
         ImageView speak = findViewById(R.id.speak1);
         ConstraintLayout display = findViewById(R.id.testg);
-
         Button showImage = findViewById(R.id.button2);
         showImage.setOnClickListener(this);
+
+        // For text change listner
+        textView2.addTextChangedListener(new TextWatcher() {
+            String question = textView2.getText().toString();
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                simplePut(question);
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+
+            }
+        });
+
+        // For Speach to Text
         speak.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -71,97 +93,92 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     ArrayList<String> result = data
                             .getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
                     textView2.setText(result.get(0));
-                    SearchShape();
+                    String question = textView2.getText().toString();
+                    simplePut(question);
                 }
                 break;
             }
         }
-
-    }
-    public class myView extends View {
-        Paint mypaint;
-        Paint mypaint1;
-        Canvas canvas1;
-        String shapeIn;
-        public myView(Context context, String shape) {
-            super(context);
-            mypaint = new Paint();
-            mypaint.setColor(Color.GREEN);
-            shapeIn=shape;
-            mypaint1 = new Paint();
-            mypaint1.setColor(Color.BLUE);
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            //super.onDraw(canvas);
-            canvas.drawColor(Color.WHITE);
-            canvas1=canvas;
-            if (shapeIn.equals("rectangle"))
-            {
-                canvas.drawRect(100,150,900,600,mypaint);
-            }
-            else if (shapeIn.equals("square")){
-                canvas.drawRect(150,150,750,750,mypaint);
-            }
-            else if (shapeIn.equals("circle"))
-            {
-                canvas.drawCircle(250, 250, 200, mypaint1);
-            }
-            else if(shapeIn.equals("triangle")){
-                /*if (type=="right"){
-                    Point a = new Point(50, 100);
-                    Point b = new Point(50, 500);
-                    Point c = new Point(400, 500);}
-                else if (type=="right"){
-                    Point a = new Point(0, 0);
-                    Point b = new Point(0, 100);
-                    Point c = new Point(87, 50);}
-                else if (type=="right"){
-                    Point a = new Point(0, 0);
-                    Point b = new Point(0, 100);
-                    Point c = new Point(87, 50);}
-                else{
-                    Point a = new Point(0, 0);
-                    Point b = new Point(0, 100);
-                    Point c = new Point(87, 50);}
-                }*/
-
-
-                Path path = new Path();
-                //path.setFillType(FillType.EVEN_ODD);
-                Point a = new Point(50, 100);
-                Point b = new Point(50, 500);
-                Point c = new Point(400, 500);
-
-                path.moveTo(a.x, a.y);
-                path.lineTo(b.x, b.y);
-                path.lineTo(c.x, c.y);
-                path.close();
-
-                canvas.drawPath(path, mypaint);
-            }
-            else
-            {
-                mypaint1.setColor(Color.RED);
-                mypaint1.setTextSize(50);
-                canvas.drawText("Shape was not identified!!", 200, 300, mypaint1);
-            }
-        }
     }
 
-    public void SearchShape() {
-        String str = textView2.getText().toString();
+    // A put request to server to put our question text
+    public void simplePut(String question){
+        String jsonBody = question;
+        String url = "http://vivekmishra01.pythonanywhere.com/updatequestion1/";
+        MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+        RequestBody body = RequestBody.create(JSON, jsonBody);
+        OkHttpClient client = new OkHttpClient();
+        Request request = new Request.Builder()
+                .url(url+jsonBody)
+                .put(body) //PUT
+                .build();
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                e.printStackTrace();
+            }
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                if (response.isSuccessful()) {
+                    //simplifYText();
+                    final String myResponse = response.body().string();
+                    //text = myResponse;
+                    MainActivity.this.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            simplifYText();
+                            textView2.setText(myResponse);
+                        }
+                    });
+                }
+            }
+        });
+    }
+    // A get request to server to get our manipulated question.
+    public void simplifYText(){
+        OkHttpClient client = new OkHttpClient();
+        String url = "http://vivekmishra01.pythonanywhere.com/";
+        Request request = new Request.Builder()
+                .url(url)
+                .build();
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                e.printStackTrace();
+            }
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                if (response.isSuccessful()) {
+                    final String myResponse = response.body().string();
+                    text = myResponse;
+                    MainActivity.this.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            textView2.setText(myResponse);
+                            SearchShape(text);
+                        }
+                    });
+                }
+            }
+        });
+    }
+    public void SearchShape(String text) {
+        //String str = textView2.getText().toString();
+        String str = text.toLowerCase();
         str = str.replaceAll("[ ](?=[ ])|[^-_A-Za-z0-9 ]+", "");
-
+        String[] tri_types = {"right","acute","obtuse","equilateral"};
+        String tri_type = "";
         String unit = "units";
         String shape = "";
+        Map<String, Double> rightTriDim = new HashMap<String, Double>();
+        rightTriDim.put("height",0.0);
+        rightTriDim.put("base",0.0);
+        String[] rightTriDims = {"base", "height","hypotenuse"};
         String[] units = {"mm", "cm", "km", "miles", "hm", "Hm","mi"};
         String[] shapes = {"square", "rectangle", "triangle", "circle"};
         //String[] rectdim = {};
 
         ArrayList<String> rectType = new ArrayList<String>();
-        ArrayList<String> triangleType = new ArrayList<String>();
 
         ArrayList<Double> rectdim = new ArrayList<Double>();
         ArrayList<Double> triangldim = new ArrayList<Double>();
@@ -170,10 +187,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         rectType.add("square");
         rectType.add("rectangle");
 
-        triangleType.add("right");
-        triangleType.add("acute");
-        triangleType.add("obtuse");
-        triangleType.add("scalene");
 
         String[] arrOfStr = str.split(" ");
 
@@ -193,9 +206,40 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         }
 
+        // to find triangle type
+        for (String s: tri_types){
+            if (str.contains(s)){
+                tri_type = s;
+                break;
+            }
+        }
+
+        //Adding right triangle dimesions
+        if (tri_type == "right") {
+            for (String s : rightTriDims) {
+                if (str.contains(s)) {
+                    int index = str.indexOf(s);
+                    for (String ss : arrOfStr){
+                        boolean numeric = true;
+                        try {
+                            Double num = Double.parseDouble(ss);
+                        } catch (NumberFormatException e) {
+                            numeric = false;
+                        }
+                        if (numeric == true){
+                            int index1 = str.indexOf(ss);
+                            if (index1 > index){
+                                rightTriDim.put(s,Double.parseDouble(ss));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Adding dimensions
         for (String s: arrOfStr){
-
             boolean numeric = true;
             try {
                 Double num = Double.parseDouble(s);
@@ -210,60 +254,59 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 Double num = Double.parseDouble(s);
                 radius = num;
             }
+            if ((numeric) && (shape == "triangle" )){
+                if (tri_type == "right") {
+                    Double num = Double.parseDouble(s);
+                    radius = num;
+                }
+                else{
+                    Double num = Double.parseDouble(s);
+                    triangldim.add(num);
+                }
+            }
         }
 
-        myView view1 = new myView(this, shape);
+        myView view1 = new myView(this, shape, str , tri_type, unit, rectdim, rectType, triangldim, rightTriDim, radius);
         // setContentView(view1);
         ConstraintLayout display = findViewById(R.id.Drawingshape);
         TextView textView = findViewById(R.id.calcText);
         display.addView(view1);
         if (shape == "rectangle" || shape  == "square"){
-            textView.setText("The area of "+shape+" is  "+rectangleArea(rectdim, shape)+" "+unit+" square");}
+            if (rectdim.size() < 1){
+                textView.setText("Proper dimension not found");
+            }
+            else {
+                Rectangle r =  new Rectangle();
+                textView.setText("The area of " + shape + " is  " + r.calculateArea(rectdim, shape) + " " + unit + " square");
+            }
+        }
 
         if (shape == "circle"){
             if (radius == 0.0){
                 textView.setText("Proper dimension not found.");
             }
             else {
-                textView.setText("The area of "+shape+" is  "+circleArea(radius)+" "+unit+" square");}
+                Circle c = new Circle();
+                textView.setText("The area of "+shape+" is  "+c.calculateArea(radius)+" "+unit+" square");}
         }
-
-
-        //if (shape == "triangle"){
-          //      textView.setText("The area of "+shape+" is  "+triangleArea(rectdim, shape)+" "+unit+" square");}
-    }
-
-    public Double circleArea(Double r){
-        return 3.14*r*r;
-    }
-
-    public Double rectangleArea(ArrayList<Double> rectdim, String shape) {
-        Collections.sort(rectdim);
-        if (rectdim.size() >= 2) {
-            return rectdim.get(0) * rectdim.get(1);
+        if (shape == "triangle") {
+            Triangle t = new Triangle();
+            double area = t.calculateArea(triangldim, tri_type, rightTriDim);
+            if (area == 0.0) {
+                textView.setText("Something went wrong!! Please try to rephrase your question.");
+            }
+            else {
+                textView.setText("The area of " + shape + " is " + area + " " + unit + " square");
+            }
         }
-        else if (rectdim.size() >= 1 && shape == "square"){
-            return rectdim.get(0) * rectdim.get(0);
-        }
-        return 0.0;
     }
-    public Double triangleArea(){
-        return 0.0;
-    }
-    public Double circlePerimeter(){
-        return 0.0;
-    }
-    public Double rectanglePerimeter(){
-        return 0.0;
-    }
-    public Double trianglePerimeter(){
-        return 0.0;
-    }
-
 
     @Override
     public void onClick(View v) {
-        SearchShape();
+        String question = textView2.getText().toString();
+        // calls the server with PUT and GET request and
+        simplePut(question);
+        //SearchShape(question);
     }
 }
 
